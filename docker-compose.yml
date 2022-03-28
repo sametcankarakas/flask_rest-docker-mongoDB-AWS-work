@@ -1,0 +1,7 @@
+version: "3.9"
+
+services:
+  web:
+    build: ./web #must have dockerfile in this directory
+    ports:
+      - "8000:5000"
