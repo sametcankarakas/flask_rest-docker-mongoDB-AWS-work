@@ -5,3 +5,7 @@ services:
     build: ./web #must have dockerfile in this directory
     ports:
       - "8000:5000"
+    links:
+      - db
+  db:
+    build: ./db
