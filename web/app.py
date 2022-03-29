@@ -1,3 +1,165 @@
+"""
+Registration of a user 0 tokens
+Each user gets 10 tokens
+Store a sentence on our database for 1 token ()
+Retrieve his stored sentence on out database for 1 token
+"""
+from flask import Flask, jsonify, request
+from flask_restful import Api, Resource
+from pymongo import MongoClient
+import bcrypt
+
+app = Flask(__name__)
+api= Api(app)
+
+client = MongoClient("mongodb://db:27017") # same name(db) in docker compose
+db = client.SentencesDatabase # its the name of the db(SentencesDatabase) that we created.
+users = db["Users"] # created collection named UserNum
+
+
+
+
+class Register(Resource):
+    def post(self):
+        #Step 1 is to get posted data by the users
+        postedData = request.get_json()
+
+        # Get the database
+        username = postedData["username"]
+        password = postedData["password"]
+
+        # Hash(password + salt) = h5glkhj4g5ş45!!^% MV%+'!E'
+        hashed_pw = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+        # Store username and pw into the data base
+        users.insert_one({
+            "Username": username,
+            "Password": hashed_pw,
+            "Sentence": "",
+            "Tokens": 6
+        })
+
+        retJson = {
+            "status": 200,
+            "msg": "You successfully signed up for the API"
+        }
+        return jsonify(retJson)
+
+class Store(Resource):
+    def post(self):
+        #Step 1 is to get posted data by the users
+        postedData = request.get_json()
+
+        #Step 2 is to read the data.
+        username = postedData["username"]
+        password = postedData["password"]
+        sentence = postedData["sentence"]
+
+        #Step 3 is verify username and pw.
+        correct_pw = verifyPW(username, password)
+
+        if not correct_pw:
+            retJson = {
+            "status": 302,
+            "msg": "Password or username doesnt match"
+            }
+            return jsonify(retJson)
+        #Step 4 verify user has enough tokens
+        num_tokens = countTokens(username)
+        if num_tokens <= 0:
+            retJson = {
+            "status": 301,
+            "msg": "Not enough tokens"
+            }
+            return jsonify(retJson)
+        #Step 5 store the sentence, take one token away and return 200
+        users.update_one({
+            "Username": username
+        },  {
+              "$set":{
+                  "Sentence": sentence,
+                  "Tokens":num_tokens-1
+                  }
+        })
+
+        retJson = {
+            "status": 200,
+            "msg": "Sentence saved successfully"
+        }
+        return jsonify(retJson)
+
+
+class Get(Resource):
+    def post(self):
+        #Step 1 is to get posted data by the users
+        postedData = request.get_json()
+
+        #Step 2 is to read the data.
+        username = postedData["username"]
+        password = postedData["password"]
+        #Step 3 is verify username and pw.
+        correct_pw = verifyPW(username, password)
+
+        if not correct_pw:
+            retJson = {
+            "status": 302,
+            "msg": "Password or username doesnt match"
+            }
+            return jsonify(retJson)
+        #Step 4 verify user has enough tokens
+        num_tokens = countTokens(username)
+        if num_tokens <= 0:
+            retJson = {
+            "status": 301,
+            "msg": "Not enough tokens"
+            }
+            return jsonify(retJson)
+
+        #MAKE THE USER PAY
+        users.update_one({
+            "Username": username
+        },  {
+              "$set":{
+                  "Tokens":num_tokens-1
+                  }
+        })
+
+        sentence = users.find({
+        "Username": username
+        })[0]["Sentence"]
+
+        retJson = {
+            "status": 200,
+            "msg": sentence
+        }
+        return jsonify(retJson)
+
+
+def verifyPW(username, password):
+    hashed_pw = users.find({
+        "Username": username
+    })[0]["Password"]
+
+    if bcrypt.checkpw(password.encode('utf-8'), hashed_pw):
+        return True
+    else:
+        return False
+
+def countTokens(username):
+    tokens = users.find({
+        "Username": username
+    })[0]["Tokens"]
+    return tokens
+
+api.add_resource(Register, "/register")
+api.add_resource(Store, "/store")
+api.add_resource(Get, "/get")
+
+
+
+if __name__ == "__main__":
+    app.run(host='0.0.0.0')
+
+"""
 from flask import Flask, jsonify, request
 from flask_restful import Api, Resource
 
@@ -155,3 +317,4 @@ def hello_world():
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0')
+"""
